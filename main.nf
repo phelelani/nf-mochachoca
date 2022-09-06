@@ -30,7 +30,7 @@ params.dup            = '/home/phelelani/nf-workflows/nf-mochachoca/data/GRCh37/
 params.map            = '/home/phelelani/nf-workflows/nf-mochachoca/data/GRCh37/genetic_map_hg19_withX.txt.gz'
 params.paneldir       = '/home/phelelani/nf-workflows/nf-mochachoca/data/GRCh37'
 params.cnps           = '/home/phelelani/nf-workflows/nf-mochachoca/data/GRCh37/cnps.bed'
-params.input_stats    = '/home/phelelani/nf-workflows/nf-mochachoca/data/GRCh37/input_stats.tsv'
+params.stats          = '/home/phelelani/projects/jonathan/RUN_2022_05_15/baf_lrr.tsv'
 
 // OUTPUT DIR
 outdir = file(params.outdir, type: 'dir')
@@ -61,7 +61,7 @@ workflow RUN_PHASING {
         run_PhaseBCF(run_ExtractGenotypes.out.chr_genotypes.flatten().map { it -> [ it.baseName[6..-1], it ] })
         run_MergeBCFs(run_PhaseBCF.out.pgt.collect())
         run_ImportPhased(run_MergeBCFs.out.comb_pgt, unphased)
-    run_ChromAlt(exclude, run_ImportPhased.out.phased_bcf).view()
+        run_ChromAlt(run_ImportPhased.out.phased_bcf, exclude).view()
 }
 
 // PICK AND CHOOSE 

@@ -3,7 +3,7 @@
 paneldir       = file(params.paneldir, type: 'dir')
 map            = file(params.map, type: 'file')
 cnps           = file(params.cnps, type: 'file')
-input_stats    = file(params.input_stats, type: 'file')
+stats          = file(params.stats, type: 'file')
 outdir         = file(params.outdir, type: 'dir')
 
 
@@ -29,8 +29,7 @@ process run_ExtractGenotypes {
 // Phase VCF file by chromosome with SHAPEIT4
 process run_PhaseBCF {
     tag { "phasing: ${chr_num}" }
-    maxForks 10
-    memory '100 GB'
+    memory '50 GB'
     clusterOptions = '--constraint=avx2'
     publishDir "${outdir}/phased_genotypes", mode: 'copy', overwrite: false
 
@@ -94,7 +93,9 @@ process run_ImportPhased {
 // Chromosomal alterations
 process run_ChromAlt {
     tag { "chrom_alt" }
+    clusterOptions = '--constraint=avx2'
     memory '100 GB'
+    cpus 40
     publishDir "${outdir}/chromosomal_alterations", mode: 'copy', overwrite: false
 
     input:
@@ -105,22 +106,23 @@ process run_ChromAlt {
     path("mocha_pgt.pg.as*"), emit: chrom_alt
     
     """
+    awk -F'\t' '{ print \$1"\t"\$22"\t"\$21 }' ${stats} | sed 's/.gtc//g' | sed 's/gtc/sample_id/' > input_stats.tmp
+    bcftools query -l mocha_pgt.pg.bcf > sample_list
+    sed -n '1p' input_stats.tmp > input_stats.tsv
+    grep -f sample_list input_stats.tmp >> input_stats.tsv
+
     bcftools +mocha \
-        --genome GRCh37 \
-        --input-stats ${input_stats} \
         --no-version \
-        --threads ${task.cpus}
-        --output - \
-        --output-type b \
+        --threads ${task.cpus} \
+        --genome GRCh37 \
+        --input-stats input_stats.tsv \
         --variants ^${bcf_exclude} \
         --calls mocha_pgt.pg.as.calls.tsv \
         --stats mocha_pgt.pg.as.stats.tsv \
         --ucsc-bed mocha_pgt.pg.as.ucsc.bed \
-        --cnp ${cnp} \
-        --mhc 6:27486711-33448264 --kir 19:54574747-55504099 \
-        mocha_pgt.pg.bcf | \
-        tee mocha_pgt.pg.as.bcf | \
-        bcftools index --force --threads ${task.cpus} --output mocha_pgt.pg.as.bcf.csi
+        --cnp ${cnps} \
+        --mhc 6:27486711-33448264 --kir 19:54574747-55504099 -Ob mocha_pgt.pg.bcf --output - | \
+        tee mocha_pgt.pg.as.bcf | bcftools index --force --threads ${task.cpus} --output mocha_pgt.pg.as.bcf.csi
     """
 }
 
